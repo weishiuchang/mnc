@@ -1,0 +1,28 @@
+# docker compose up -d
+# docker compose exec -it -u $USER mnc bash
+
+services:
+  mnc:
+    image: mnc-dev
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+      target: dev
+    init: true
+    command:
+    - sh
+    - -c
+    - >
+      set -x
+      && apk add git musl-dev
+      && apk add bash less
+      && echo '${USER}:x:'`stat -c '%u:%g' /build`':${USER}:${HOME}:/bin/bash' >> /etc/passwd
+      && tail -F /dev/null
+    environment:
+      HOME: ${HOME}
+      CARGO_HOME: /build/.cargo
+    volumes:
+    - .:/build
+    - ${HOME}:${HOME}
+    working_dir: /build
+    network_mode: host

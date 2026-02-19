@@ -1,0 +1,15 @@
+*~
+*.sw[po]
+*.py[cho]
+.nfs*
+*.o
+.depend
+.coverage
+*test.conf
+gmon.out
+perf.data*
+temp/
+report/
+.cargo/
+target/
+.env

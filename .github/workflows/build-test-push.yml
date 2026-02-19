@@ -1,0 +1,94 @@
+name: Build, Test, and Push Container Images
+
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - 'v*'
+  pull_request:
+    branches:
+    - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Cargo test
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        target: test
+        tags: test
+        push: false
+        outputs: type=cacheonly
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Log in to GHCR
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set short sha
+      id: shortsha
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=sha,format=short,prefix=
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push release image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        target: release
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Extract metadata for Debug
+      id: meta-debug
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=sha,format=short,prefix=,suffix=-debug
+          type=semver,pattern={{version}},suffix=-debug
+          type=semver,pattern={{major}}.{{minor}},suffix=-debug
+          type=semver,pattern={{major}},suffix=-debug
+
+    - name: Build and push debug image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: debug
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-debug.outputs.tags }}
+        labels: ${{ steps.meta-debug.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
