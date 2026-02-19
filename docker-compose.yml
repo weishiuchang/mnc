@@ -1,0 +1,27 @@
+# docker compose up -d
+# docker compose exec -it -u 1000:1000 dev bash
+
+services:
+  dev:
+    image: mnc-dev
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+      target: dev
+    init: true
+    command:
+    - sh
+    - -c
+    - >
+      set -x
+      && apk add git musl-dev
+      && apk add bash less
+      && echo '${USER}:x:1000:1000:${USER}:${HOME}:/bin/bash' >> /etc/passwd
+      && tail -F /dev/null
+    environment:
+      HOME: ${HOME}
+    volumes:
+    - .:/build
+    - ${HOME}:${HOME}
+    working_dir: /build
+    network_mode: host
