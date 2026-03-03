@@ -33,7 +33,7 @@ pub fn spawn(config: WriterConfig) -> JoinHandle<Result<()>> {
         run_writer(&config)
             .inspect(|_| log::debug!("writer exited"))
             .inspect_err(|e| {
-                log::error!("{e:?}");
+                log::debug!("{e:?}");
                 config.shared_state.signal_exit()
             })
     })

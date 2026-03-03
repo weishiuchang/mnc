@@ -30,7 +30,7 @@ pub fn spawn(config: ReaderConfig) -> JoinHandle<Result<()>> {
         run_reader(&config)
             .inspect(|_| log::debug!("reader exited"))
             .inspect_err(|e| {
-                log::error!("{e:?}");
+                log::debug!("{e:?}");
                 config.shared_state.signal_exit()
             })
     })
