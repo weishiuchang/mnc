@@ -10,8 +10,8 @@ use crate::{
     sdds, vita49,
 };
 
-// We only need to print every 2 seconds.
-const STATISTICS_DELAY_SECS: u64 = 2;
+// Print every second.
+const STATISTICS_DELAY_SECS: u64 = 1;
 
 pub struct StatisticsConfig {
     pub channels: (Receiver<Packets>, Sender<Packets>),
@@ -23,7 +23,7 @@ pub fn spawn(config: StatisticsConfig) -> JoinHandle<Result<()>> {
         run_statistics(&config)
             .inspect(|_| log::debug!("statistics exited"))
             .inspect_err(|e| {
-                log::error!("{e:?}");
+                log::debug!("{e:?}");
                 config.shared_state.signal_exit()
             })
     })

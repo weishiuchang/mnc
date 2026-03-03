@@ -38,7 +38,7 @@ mod writer;
   # Receive \"Hello World\" on eth1
   mnc eth1:239.1.1.1
 
-  # Receive and display statistics every 2 seconds
+  # Receive and display statistics every second
   mnc 239.1.1.1 -s
 
   # Display a hex dump of the first packet received
@@ -87,7 +87,7 @@ struct Args {
     #[arg(
         short = 's',
         long = "statistics",
-        help = "Display statistics every 2 seconds"
+        help = "Display statistics every second"
     )]
     stats: bool,
 
