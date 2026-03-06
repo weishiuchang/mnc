@@ -37,18 +37,21 @@ pub fn parse_header(packet: &[u8]) -> Vita49Header {
         };
     }
 
-    let byte4 = packet.get(4).map(|&b| u16::from(b)).unwrap_or(0);
-    let byte5 = packet.get(5).map(|&b| u16::from(b)).unwrap_or(0);
-    let byte6 = packet.get(6).map(|&b| u32::from(b)).unwrap_or(0);
-    let byte7 = packet.get(7).map(|&b| u32::from(b)).unwrap_or(0);
-
-    let frame_sequence_number = (byte4 << 4) | (byte5 >> 4);
-
-    let frame_size = (u32::from(byte5 & 0x0F) << 16) | (byte6 << 8) | byte7;
+    // Read bytes 4-7 as a single big-endian u32 instead of four separate byte reads.
+    // The VITA49 fields map directly onto the word:
+    //   frame_sequence_number = bits 31..20  (top 12 bits)
+    //   frame_size            = bits 19..0   (bottom 20 bits)
+    let Some(chunk) = packet.get(4..8) else {
+        return Vita49Header {
+            frame_sequence_number: 0,
+            frame_size: 0,
+        };
+    };
+    let word = u32::from_be_bytes(chunk.try_into().unwrap_or([0u8; 4]));
 
     Vita49Header {
-        frame_sequence_number,
-        frame_size,
+        frame_sequence_number: (word >> 20) as u16,
+        frame_size: word & 0x000F_FFFF,
     }
 }
 

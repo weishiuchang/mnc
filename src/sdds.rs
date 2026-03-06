@@ -21,6 +21,34 @@
 //   20          reserved
 //   1024        [Data]
 
+pub struct SddsFrameHeader {
+    pub frame_sequence_number: u16,
+    pub time_tag: u64,
+}
+
+/// Parse frame_sequence_number and time_tag in one 128-bit load.
+#[inline]
+pub fn parse_frame_header(packet: &[u8]) -> SddsFrameHeader {
+    let Some(s) = packet.get(..16) else {
+        return SddsFrameHeader {
+            frame_sequence_number: 0,
+            time_tag: 0,
+        };
+    };
+    let Ok(arr) = <&[u8; 16]>::try_from(s) else {
+        return SddsFrameHeader {
+            frame_sequence_number: 0,
+            time_tag: 0,
+        };
+    };
+    let big = u128::from_be_bytes(*arr);
+    SddsFrameHeader {
+        frame_sequence_number: ((big >> 96) & 0xFFFF) as u16,
+        time_tag: big as u64,
+    }
+}
+
+#[inline]
 pub fn frame_sequence_number(packet: &[u8]) -> u16 {
     packet
         .get(2..4)
@@ -29,6 +57,7 @@ pub fn frame_sequence_number(packet: &[u8]) -> u16 {
         .unwrap_or(0)
 }
 
+#[inline]
 pub fn time_tag(packet: &[u8]) -> u64 {
     packet
         .get(8..16)

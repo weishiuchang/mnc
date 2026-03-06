@@ -73,7 +73,8 @@ fn run_statistics(
                 print_hex_dump(packet);
             },
             |packet, state: &mut SddsState| {
-                let seq = sdds::frame_sequence_number(packet);
+                let header = sdds::parse_frame_header(packet);
+                let seq = header.frame_sequence_number;
                 if seq.is_multiple_of(32) {
                     state.last_seq = Some(seq);
                     return; // Every 32 packet is a parity packet
@@ -90,9 +91,7 @@ fn run_statistics(
                     }
                 }
                 state.last_seq = Some(seq);
-
-                let timetag = sdds::time_tag(packet);
-                state.latest_timestamp = sdds::format_timestamp(timetag);
+                state.latest_timestamp = sdds::format_timestamp(header.time_tag);
             },
             |count, rate, state: &SddsState| {
                 let mut s = format!(
