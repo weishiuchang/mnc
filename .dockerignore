@@ -1,4 +1,5 @@
 **
+!benches
 !Cargo.lock
 !Cargo.toml
 !Dockerfile
