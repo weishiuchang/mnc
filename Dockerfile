@@ -19,6 +19,7 @@ WORKDIR $WORKDIR
 ADD . $WORKDIR/
 
 RUN set -x \
+    && cargo build --locked --target x86_64-alpine-linux-musl \
     && cargo build --release --locked --target x86_64-alpine-linux-musl
 
 # Test
@@ -32,14 +33,17 @@ WORKDIR $WORKDIR
 ADD . $WORKDIR/
 
 RUN set -x \
-    && cargo test --release --locked --all
+    && cargo test --locked --all
 
 # Debug
 FROM busybox AS debug
 
 LABEL maintainer="davecx@gmail.com"
 
-COPY --from=builder /build/target/x86_64-alpine-linux-musl/release/mnc /mnc
+ENV RUST_BACKTRACE=1
+ENV RUST_LOG=debug
+
+COPY --from=builder /build/target/x86_64-alpine-linux-musl/debug/mnc /mnc
 
 # Release
 FROM scratch AS release

@@ -14,7 +14,7 @@ use packet::{PacketType, Packets};
 /// Max UDP Packet size in bytes
 const MAX_PACKET_BYTES: usize = 65536;
 /// How many packets in each batch
-const PACKETS_BATCH_SIZE: usize = 1000;
+const PACKETS_BATCH_SIZE: usize = 100;
 
 mod error;
 mod multicast;
@@ -102,7 +102,7 @@ struct Args {
     #[arg(
         short = 'b',
         long = "buffer-size",
-        default_value = "10000",
+        default_value = "100",
         help = "In-memory buffer capacity"
     )]
     buffer_size: usize,
@@ -213,21 +213,20 @@ fn main() -> anyhow::Result<()> {
     let mut all_threads: Vec<_> = Vec::new();
 
     // Memory return channel: Writer -> Reader for packet recycling
-    const PACKET_BATCH_SIZE: usize = 1000;
     let (memory_return_tx, memory_return_rx): (Sender<Packets>, Receiver<Packets>) =
-        bounded(PACKET_BATCH_SIZE);
+        bounded(args.buffer_size + 1);
 
     // Memory allocation is expensive at high pps, so do this in a background thread.
     initialize_memory_pool(
         memory_return_tx.clone(),
-        PACKET_BATCH_SIZE,
+        args.buffer_size,
         shared_state.clone(),
     );
 
     // Reader -> [Statistics] -> Writer -> Reader (memory return)
-    let (reader_tx, reader_rx) = bounded(args.buffer_size);
+    let (reader_tx, reader_rx) = bounded(args.buffer_size + 1);
     let writer_rx = if !args.quiet && (args.stats || args.verbose) {
-        let (stats_tx, stats_rx) = bounded(args.buffer_size);
+        let (stats_tx, stats_rx) = bounded(args.buffer_size + 1);
 
         // Statistics gives us some useful information about the packets
         log::debug!("spawning statistics thread");
