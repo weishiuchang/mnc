@@ -48,7 +48,7 @@ pub fn run_reader(
     }: &ReaderConfig,
 ) -> Result<()> {
     match &input {
-        Some(filename) if filename == "=" => {
+        Some(filename) if filename == "-" => {
             log::info!("reading from stdin");
             read_from_stdin(channels, shared_state, *max_count)
         }
