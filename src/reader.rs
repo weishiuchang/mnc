@@ -9,7 +9,7 @@ use crossbeam_channel::{Receiver, Sender};
 use nix::sys::socket::{MsgFlags, MultiHeaders, SockaddrStorage, recvmmsg};
 
 use crate::{
-    MAX_PACKET_BYTES, PACKETS_BATCH_SIZE, SharedState,
+    MAX_PACKET_BYTES, SharedState,
     error::{LibError, Result},
     multicast::{create_recv_socket, socket_to_raw_fd},
     packet::{PacketType, Packets},
@@ -20,6 +20,7 @@ pub struct ReaderConfig {
     pub iface: Option<String>,
     pub mgroup: String,
     pub port: u16,
+    pub batch_size: usize,
     pub channels: (Sender<Packets>, Receiver<Packets>),
     pub shared_state: SharedState,
     pub max_count: u64,
@@ -42,6 +43,7 @@ pub fn run_reader(
         iface,
         mgroup,
         port,
+        batch_size,
         channels,
         shared_state,
         max_count,
@@ -66,6 +68,7 @@ pub fn run_reader(
                 iface.as_deref(),
                 mgroup,
                 *port,
+                *batch_size,
                 channels,
                 shared_state,
                 *max_count,
@@ -78,6 +81,7 @@ pub fn read_from_network(
     iface: Option<&str>,
     mgroup: &str,
     port: u16,
+    batch_size: usize,
     (data_tx, memory_return_rx): &(Sender<Packets>, Receiver<Packets>),
     shared_state: &SharedState,
     max_count: u64,
@@ -85,8 +89,8 @@ pub fn read_from_network(
     let socket = create_recv_socket(iface, mgroup, port)?;
     let fd = socket_to_raw_fd(&socket);
 
-    let mut headers = MultiHeaders::<SockaddrStorage>::preallocate(PACKETS_BATCH_SIZE, None);
-    let mut byte_counts: Vec<usize> = Vec::with_capacity(PACKETS_BATCH_SIZE);
+    let mut headers = MultiHeaders::<SockaddrStorage>::preallocate(batch_size, None);
+    let mut byte_counts: Vec<usize> = Vec::with_capacity(batch_size);
 
     loop {
         // Pull a recycled Packets from the memory pool (blocking)

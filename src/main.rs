@@ -13,8 +13,6 @@ use packet::{PacketType, Packets};
 
 /// Max UDP Packet size in bytes
 const MAX_PACKET_BYTES: usize = 65536;
-/// How many packets in each batch
-const PACKETS_BATCH_SIZE: usize = 100;
 
 mod error;
 mod multicast;
@@ -101,11 +99,19 @@ struct Args {
 
     #[arg(
         short = 'b',
-        long = "buffer-size",
+        long = "batch-size",
         default_value = "100",
-        help = "In-memory buffer capacity"
+        help = "packets per recvmmsg"
     )]
-    buffer_size: usize,
+    batch_size: usize,
+
+    #[arg(
+        short = 'B',
+        long = "pool-size",
+        default_value = "100",
+        help = "Memory pool packet batches"
+    )]
+    pool_size: usize,
 
     #[arg(
         short = 'L',
@@ -214,19 +220,20 @@ fn main() -> anyhow::Result<()> {
 
     // Memory return channel: Writer -> Reader for packet recycling
     let (memory_return_tx, memory_return_rx): (Sender<Packets>, Receiver<Packets>) =
-        bounded(args.buffer_size + 1);
+        bounded(args.pool_size + 1);
 
     // Memory allocation is expensive at high pps, so do this in a background thread.
     initialize_memory_pool(
         memory_return_tx.clone(),
-        args.buffer_size,
+        args.batch_size,
+        args.pool_size,
         shared_state.clone(),
     );
 
     // Reader -> [Statistics] -> Writer -> Reader (memory return)
-    let (reader_tx, reader_rx) = bounded(args.buffer_size + 1);
+    let (reader_tx, reader_rx) = bounded(args.pool_size + 1);
     let writer_rx = if !args.quiet && (args.stats || args.verbose) {
-        let (stats_tx, stats_rx) = bounded(args.buffer_size + 1);
+        let (stats_tx, stats_rx) = bounded(args.pool_size + 1);
 
         // Statistics gives us some useful information about the packets
         log::debug!("spawning statistics thread");
@@ -265,6 +272,7 @@ fn main() -> anyhow::Result<()> {
         iface: args.mgroup.0.clone(),
         mgroup: args.mgroup.1.clone(),
         port: args.port,
+        batch_size: args.batch_size,
         channels: (reader_tx, memory_return_rx),
         shared_state: shared_state.clone(),
         max_count,
@@ -342,6 +350,7 @@ fn parse_mgroup(s: &str) -> std::result::Result<(Option<String>, String), String
 // except on exit.
 fn initialize_memory_pool(
     memory_return_tx: Sender<Packets>,
+    batch_size: usize,
     pool_size: usize,
     shared_state: SharedState,
 ) {
@@ -354,7 +363,7 @@ fn initialize_memory_pool(
                 return;
             }
 
-            let packets = Packets::new(PACKETS_BATCH_SIZE, MAX_PACKET_BYTES);
+            let packets = Packets::new(batch_size, MAX_PACKET_BYTES);
             if let Err(e) = memory_return_tx.send(packets) {
                 log::error!("failed to initialize memory pool: {e:?}");
                 return;
