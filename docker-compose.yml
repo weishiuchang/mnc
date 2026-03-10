@@ -21,6 +21,8 @@ services:
     environment:
       HOME: ${HOME}
       CARGO_HOME: /build/.cargo
+      RUSTFLAGS: "-C target-feature=+crt-static"
+      CARGO_BUILD_TARGET: x86_64-alpine-linux-musl
     volumes:
     - .:/build
     - ${HOME}:${HOME}
