@@ -15,7 +15,7 @@ pub fn create_recv_socket(iface: Option<&str>, mgroup: &str, port: u16) -> Resul
     // Large receiver buffer (256MB) to handle higher packet rates
     set_recv_buffer_size(&socket, 256 * 1024 * 1024)?;
 
-    // Let the kernel determin the default address if not specified by user
+    // Let the kernel determine the default address if not specified by user
     let iface_addr = if let Some(iface_name) = iface {
         get_interface_addr(iface_name)?
     } else {
@@ -43,12 +43,17 @@ pub fn create_send_socket(iface: Option<&str>, mgroup: &str, port: u16, ttl: u8)
 
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
-    if let Some(iface_name) = iface {
-        let iface_addr = get_interface_addr(iface_name)?;
-        socket.set_multicast_if_v4(&iface_addr)?;
-    }
+    // Let the kernel determine the default address if not specified by user
+    let iface_addr = if let Some(iface_name) = iface {
+        get_interface_addr(iface_name)?
+    } else {
+        get_default_interface_for_multicast(&mcast_addr)?
+    };
 
-    // Useful troublehooting value for network engineers
+    // IP_MULTICAST_IF
+    socket.set_multicast_if_v4(&iface_addr)?;
+
+    // Useful troublehooting for network engineers
     socket.set_multicast_ttl_v4(ttl.into())?;
 
     let dest_addr = SocketAddr::new(IpAddr::V4(mcast_addr), port);
