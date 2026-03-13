@@ -31,7 +31,7 @@ mod writer;
   mnc 239.1.1.1
 
   # Send string to multcast group as a single packet
-  echo \"Hello World\" | mnc 239.1.1.1.1 -i -
+  echo \"Hello World\" | mnc 239.1.1.1 -i -
 
   # Receive \"Hello World\" on eth1
   mnc eth1:239.1.1.1
@@ -365,7 +365,7 @@ fn initialize_memory_pool(
 
             let packets = Packets::new(batch_size, MAX_PACKET_BYTES);
             if let Err(e) = memory_return_tx.send(packets) {
-                log::error!("failed to initialize memory pool: {e:?}");
+                log::debug!("memory pool initialization incomplete: {e:?}");
                 return;
             }
         }

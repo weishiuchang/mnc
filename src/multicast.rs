@@ -25,12 +25,11 @@ pub fn create_recv_socket(iface: Option<&str>, mgroup: &str, port: u16) -> Resul
     // IP_MULTICAST_IF
     socket.set_multicast_if_v4(&iface_addr)?;
 
-    // IP_ADD_MEMBERSHIP
-    // Join before bind to get the data flow going
-    socket.join_multicast_v4(&mcast_addr, &iface_addr)?;
-
-    let bind_addr = SocketAddr::new(IpAddr::V4(mcast_addr), port);
+    let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port);
     socket.bind(&bind_addr.into())?;
+
+    // IP_ADD_MEMBERSHIP
+    socket.join_multicast_v4(&mcast_addr, &iface_addr)?;
 
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
@@ -42,6 +41,7 @@ pub fn create_send_socket(iface: Option<&str>, mgroup: &str, port: u16, ttl: u8)
     let mcast_addr: Ipv4Addr = mgroup.parse()?;
 
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    socket.set_reuse_address(true)?;
 
     // Let the kernel determine the default address if not specified by user
     let iface_addr = if let Some(iface_name) = iface {
