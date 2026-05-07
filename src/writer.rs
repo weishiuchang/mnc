@@ -193,7 +193,9 @@ fn write_with_sendmmsg(
             .map(|pkt| [IoSlice::new(pkt)])
             .collect();
 
-        sendmmsg(fd, &mut headers, &iovecs, [], [], MsgFlags::empty())?;
+        // sendmmsg zips slices with addrs — must be same length.
+        let addrs: Vec<Option<SockaddrStorage>> = vec![None; send_count];
+        sendmmsg(fd, &mut headers, &iovecs, &addrs, [], MsgFlags::empty())?;
 
         shared_state.add_write_count(send_count as u64);
 
