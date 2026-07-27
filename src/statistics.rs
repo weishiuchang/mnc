@@ -149,26 +149,28 @@ fn produce_stats<S: Default>(
     let mut state = S::default();
 
     loop {
-        let packets = match data_rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(packets) => packets,
-            Err(crossbeam_channel::RecvTimeoutError::Timeout) => continue,
-            Err(e) => return Err(e.into()),
-        };
+        let mut is_eof = false;
 
-        let is_eof = packets.is_empty();
+        match data_rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(packets) => {
+                is_eof = packets.is_empty();
 
-        for packet in packets.iter() {
-            packet_count += 1;
+                for packet in packets.iter() {
+                    packet_count += 1;
 
-            process_packet(packet, &mut state);
+                    process_packet(packet, &mut state);
 
-            if shared_state.verbose {
-                hex_print(packet);
+                    if shared_state.verbose {
+                        hex_print(packet);
+                    }
+                }
+
+                // Hand off the packets to the next thread, including the eof sentinel
+                data_tx.try_send(packets)?;
             }
+            Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
+            Err(e) => return Err(e.into()),
         }
-
-        // Hand off the packets to the next thread, including the eof sentinel
-        data_tx.try_send(packets)?;
 
         let elapsed = last_time.elapsed();
         if elapsed >= Duration::from_secs(STATISTICS_DELAY_SECS) {

@@ -70,7 +70,7 @@ mnc 239.1.1.1 -i ./input.bin -i binary
 mnc 239.1.1.1 -o ./output.bin
 ```
 
-**Print packet counts every two seconds:**
+**Print packet counts every second:**
 ```bash
 mnc 239.1.1.1 -s
 ```
