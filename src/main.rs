@@ -25,6 +25,7 @@ mod writer;
 
 #[derive(Parser)]
 #[command(name = "mnc")]
+#[command(version = get_version())]
 #[command(about = "Multicast netcat - CLI utility for sending and receiving multicast packets")]
 #[command(after_help = "EXAMPLES:
   # Receive from multicast group and display text payload
@@ -321,6 +322,24 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// Version priority: CI_COMMIT_TAG, then CI_COMMIT_SHORT_SHA, then CARGO_PKG_VERSION, then 0.1.0.
+// Empty strings are treated the same as unset.
+fn get_version() -> &'static str {
+    let tag = option_env!("CI_COMMIT_TAG").filter(|v| !v.is_empty());
+    let short_sha = option_env!("CI_COMMIT_SHORT_SHA").filter(|v| !v.is_empty());
+    let pkg_version = option_env!("CARGO_PKG_VERSION").filter(|v| !v.is_empty());
+
+    if let Some(tag) = tag {
+        tag
+    } else if let Some(short_sha) = short_sha {
+        short_sha
+    } else if let Some(pkg_version) = pkg_version {
+        pkg_version
+    } else {
+        "0.1.0"
+    }
 }
 
 // Parse [eth:]mgroup into (eth, mgroup)

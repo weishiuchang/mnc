@@ -1,0 +1,121 @@
+# ghcr.io/weishiuchang/mnc:<shortsha>
+
+name: Build, Test, and Tag Container Images
+
+on:
+  push:
+    branches:
+    - '**'
+    tags:
+    - '[0-9]+.[0-9]+.[0-9]+*'
+  pull_request:
+    branches:
+    - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Cargo test
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        target: test
+        tags: test
+        push: false
+        outputs: type=cacheonly
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to GHCR
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set short sha
+      id: shortsha
+      run: echo "sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+    - name: Build release image
+      id: build
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        target: release
+        push: ${{ github.event_name != 'pull_request' }}
+        outputs: ${{ github.event_name != 'pull_request' && format('type=image,name=ghcr.io/{0},push-by-digest=true,name-canonical=true,push=true', github.repository) || 'type=cacheonly' }}
+        build-args: |
+          CI_COMMIT_TAG=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          CI_COMMIT_SHORT_SHA=${{ steps.shortsha.outputs.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Take the image:digest from build job and tag with:
+  #
+  # - image:<short sha>: on push to feature branch or main
+  # - image:latest: on push to main only
+  # - image:<tag>: on push to main and tag
+  tag:
+    needs: [test, build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=sha,format=short,prefix=
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Tag image by digest
+      run: |
+        TAGS=()
+        while IFS= read -r tag; do
+          [ -n "$tag" ] && TAGS+=(-t "$tag")
+        done <<< "${{ steps.meta.outputs.tags }}"
+        docker buildx imagetools create "${TAGS[@]}" "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.digest }}"
